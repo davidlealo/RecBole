@@ -23,6 +23,8 @@ install_requires = [
     "texttable>=0.9.0",
     "psutil>=5.9.0",
     #"ray>=2.31.0",
+    "texttable>=0.9.0", # Nos faltaba agregar
+    "thop>=0.1.1.post2207130030", # Nos faltaba agregar
 ]
 
 setup_requires = []
