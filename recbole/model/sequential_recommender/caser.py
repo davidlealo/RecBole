@@ -26,7 +26,7 @@ from torch.nn import functional as F
 from torch.nn.init import normal_, xavier_normal_, constant_
 
 from recbole.model.abstract_recommender import SequentialRecommender
-from recbole.model.loss import RegLoss, BPRLoss
+from recbole.model.loss import RegLoss, BPRLoss, TOP1Loss
 
 
 class Caser(SequentialRecommender):
@@ -97,8 +97,10 @@ class Caser(SequentialRecommender):
             self.loss_fct = BPRLoss()
         elif self.loss_type == "CE":
             self.loss_fct = nn.CrossEntropyLoss()
+        elif self.loss_type == "TOP1":
+            self.loss_fct = TOP1Loss()
         else:
-            raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE']!")
+            raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE', 'TOP1']!")
 
         # parameters initialization
         self.apply(self._init_weights)
@@ -159,13 +161,14 @@ class Caser(SequentialRecommender):
         user = interaction[self.USER_ID]
         seq_output = self.forward(user, item_seq)
         pos_items = interaction[self.POS_ITEM_ID]
-        if self.loss_type == "BPR":
+        if self.loss_type in ["BPR", "TOP1"]:
             neg_items = interaction[self.NEG_ITEM_ID]
             pos_items_emb = self.item_embedding(pos_items)
             neg_items_emb = self.item_embedding(neg_items)
-            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [B]
-            neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)  # [B]
+            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
+            neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)
             loss = self.loss_fct(pos_score, neg_score)
+            return loss
 
         else:  # self.loss_type = 'CE'
             test_item_emb = self.item_embedding.weight

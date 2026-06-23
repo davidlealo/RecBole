@@ -20,7 +20,7 @@ from torch import nn
 
 from recbole.model.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder
-from recbole.model.loss import BPRLoss
+from recbole.model.loss import BPRLoss, TOP1Loss
 
 
 class SASRec(SequentialRecommender):
@@ -74,8 +74,10 @@ class SASRec(SequentialRecommender):
             self.loss_fct = BPRLoss()
         elif self.loss_type == "CE":
             self.loss_fct = nn.CrossEntropyLoss()
+        elif self.loss_type == "TOP1":
+            self.loss_fct = TOP1Loss()
         else:
-            raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE']!")
+            raise NotImplementedError("Make sure 'loss_type' in ['BPR', 'CE', 'TOP1']!")
 
         # parameters initialization
         self.apply(self._init_weights)
@@ -118,12 +120,12 @@ class SASRec(SequentialRecommender):
         item_seq_len = interaction[self.ITEM_SEQ_LEN]
         seq_output = self.forward(item_seq, item_seq_len)
         pos_items = interaction[self.POS_ITEM_ID]
-        if self.loss_type == "BPR":
+        if self.loss_type in ["BPR", "TOP1"]:
             neg_items = interaction[self.NEG_ITEM_ID]
             pos_items_emb = self.item_embedding(pos_items)
             neg_items_emb = self.item_embedding(neg_items)
-            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [B]
-            neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)  # [B]
+            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
+            neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)
             loss = self.loss_fct(pos_score, neg_score)
             return loss
         else:  # self.loss_type = 'CE'

@@ -104,3 +104,39 @@ class EmbMarginLoss(nn.Module):
             norm_e = torch.sum(embedding**self.power, dim=1, keepdim=True)
             emb_loss += torch.sum(torch.max(norm_e - cache_one, cache_zero))
         return emb_loss
+
+class TOP1Loss(nn.Module):
+    """TOP1Loss, basada en el paper original de GRU4Rec (Hidasi et al., 2015).
+
+    La fórmula es:
+        L = (1/N_s) * sum_j [ sigma(r_j - r_i) + sigma(r_j^2) ]
+
+    donde r_i es el score del ítem positivo y r_j el de cada negativo.
+    El término sigma(r_j^2) es la regularización característica de TOP1:
+    penaliza scores negativos altos sin necesidad de L2 externo.
+
+    Shape:
+        - pos_score: (B,) o (B, N_s) — score del ítem relevante
+        - neg_score: (B,) o (B, N_s) — score(s) del/los ítem(s) negativo(s)
+        - Output: escalar
+    """
+
+    def __init__(self):
+        super(TOP1Loss, self).__init__()
+
+    def forward(self, pos_score, neg_score):
+        # Asegurar que neg_score tenga al menos 2 dimensiones para broadcasting
+        if neg_score.dim() == 1:
+            neg_score = neg_score.unsqueeze(1)   # (B, 1)
+        if pos_score.dim() == 1:
+            pos_score = pos_score.unsqueeze(1)   # (B, 1)
+
+        # sigma(r_j - r_i): penaliza cuando el negativo supera al positivo
+        ranking_loss = torch.sigmoid(neg_score - pos_score)
+
+        # sigma(r_j^2): regularización que penaliza scores negativos altos
+        reg_loss = torch.sigmoid(neg_score ** 2)
+
+        loss = (ranking_loss + reg_loss).mean()
+        return loss
+    
